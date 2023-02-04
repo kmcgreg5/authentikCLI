@@ -56,6 +56,10 @@ def add_domain(name: str, domain: str, host: str, token: str, application_args:d
         sys.exit("Invalid keys passed to provider arguments.")
     if validate_keys(outpost_keys, outpost_args.keys()) is False:
         sys.exit("Invalid keys passed to outpost arguments.")
+    
+    modes = ["proxy", "forward_single", "forward_domain"]
+    if provider_args['mode'] not in modes:
+        sys.exit("Unimplemented provider mode selected")
 
     with AuthentikAPI(host, token) as authentik:
         # Check provider is not already registered
@@ -76,7 +80,9 @@ def add_domain(name: str, domain: str, host: str, token: str, application_args:d
         if provider_template is None:
             sys.exit("Failed to fetch provider template.")
         
-        params: dict = {"name":name, "authorization_flow":provider_template["authorization_flow"], "external_host":f'https://{domain}',
+        # Assemble parameters based on type
+        if provider_args["mode"] == "forward_single":
+            params: dict = {"name":name, "authorization_flow":provider_template["authorization_flow"], "external_host":f'https://{domain}',
                         "mode":provider_args["mode"], "token_validity":provider_args['token_validity']}
         
         # Create provider
