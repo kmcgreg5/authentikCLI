@@ -14,7 +14,7 @@ def main():
     add_domain_parser.add_argument("name", help="The display name of the application and provider.")
     add_domain_parser.add_argument("domain", help="The domain to create.")
     add_domain_parser.add_argument("host", help="The Authentik instance url.")
-    add_domain_parser.add_argument("token-file", help="The path to a file containing an Authentik authentication token.")
+    add_domain_parser.add_argument("tokenfile", help="The path to a file containing an Authentik authentication token.")
 
     add_domain_parser.add_argument("--app-template", default="template", help="The template application name to search for.")
     add_domain_parser.add_argument("--app-group", help="The group of the application.")
@@ -29,13 +29,13 @@ def main():
     delete_domain_parser = subparsers.add_parser("delete-domain", help="Deletes an application and provider.")
     delete_domain_parser.add_argument("domain", help="The domain to delete.")
     delete_domain_parser.add_argument("host", help="The Authentik instance url.")
-    delete_domain_parser.add_argument("token-file", help="The path to a file containing an Authentik authentication token.")
+    delete_domain_parser.add_argument("tokenfile", help="The path to a file containing an Authentik authentication token.")
     delete_domain_parser.add_argument("--provider-type", default="proxy", choices=["proxy", "ldap", "oauth2", "saml"], help="The provider type to match.")
     
     args = parser.parse_args()
 
     if args.command == "add-domain":
-        token: Optiona[str] = read_token(args.token_file)
+        token: Optiona[str] = read_token(args.tokenfile)
         if token is None:
             sys.exit("Failed to read token file.")
         provider_args: dict={"provider_template":args.provider_template, "mode":args.provider_mode, "token_validity":args.provider_token_validity}
@@ -43,7 +43,7 @@ def main():
         outpost_args: dict={"name":args.outpost_name}
         add_domain(args.name, args.domain, args.host, token, application_args, provider_args, outpost_args)
     elif args.command == "delete-domain":
-        token: Optiona[str] = read_token(args.token_file)
+        token: Optiona[str] = read_token(args.tokenfile)
         if token is None:
             sys.exit("Failed to read token file.")
         delete_domain(args.domain, args.provider_type, args.host, token)
