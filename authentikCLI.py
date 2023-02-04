@@ -38,8 +38,9 @@ def main():
         token: Optiona[str] = read_token(args.tokenfile)
         if token is None:
             sys.exit("Failed to read token file.")
+        group: Optional[str] = None if args.app_group is None or args.app_group.strip() == '' else args.app_group
         provider_args: dict={"provider_template":args.provider_template, "mode":args.provider_mode, "token_validity":args.provider_token_validity}
-        application_args: dict={"app_template":args.app_template, "app_group":args.app_group}
+        application_args: dict={"app_template":args.app_template, "app_group":group}
         outpost_args: dict={"name":args.outpost_name}
         add_domain(args.name, args.domain, args.host, token, application_args, provider_args, outpost_args)
     elif args.command == "delete-domain":
