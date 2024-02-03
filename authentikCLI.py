@@ -5,35 +5,55 @@ import sys
 import re
 import os
 
-def main():
-    parser = ArgumentParser(prog="authentikCLI.py")
-    subparsers = parser.add_subparsers(help="The supported commands.", dest="command")
+class CLIException(Exception):
+    pass
 
-    # Add domain parser
-    add_domain_parser = subparsers.add_parser("add-domain", help="Create an application and provider, and update the outpost for a new domain.")
-    add_domain_parser.add_argument("name", help="The display name of the application and provider.")
-    add_domain_parser.add_argument("domain", help="The domain to create.")
-    add_domain_parser.add_argument("host", help="The Authentik instance url.")
-    add_domain_parser.add_argument("tokenfile", help="The path to a file containing an Authentik authentication token.")
+def main(args: list=sys.argv[1:]):
+    parser = ArgumentParser(prog="Authentik CLI")
+    parser.add_argument("--host", help="The Authentik Server host.", nargs='?')
+    parser.add_argument("--token", help="The token to use for authentication.", nargs='?')
+    parser.add_argument("--port", help="The port to connect to.", nargs='?', type=int, default=AuthentikAPI.DEFAULT_PORT)
 
-    add_domain_parser.add_argument("--app-template", default="template", help="The template application name to search for.")
-    add_domain_parser.add_argument("--app-group", help="The group of the application.")
+    items = parser.add_subparsers(help="The supported items to operate on.", dest="item")
 
-    add_domain_parser.add_argument("--provider-template", default="template", help="The template provider name to search for.")
-    add_domain_parser.add_argument("--provider-mode", default="forward_single", choices=["proxy", "forward_single", "forward_domain"], help="The mode of the provider.")
-    add_domain_parser.add_argument("--provider-token-validity", default="hours=24", help="The token validity of the provider.")
+    # Domain parser
+    domain_parser = items.add_parser("domain")
+    operations = domain_parser.add_subparsers(help="The operation to perform.", dest="operation")
+    # Add Domain parser
+    domain_add_parser = operations.add_parser("add")
+    domain_add_parser.add_argument("name", help="The display name of the application and provider.")
+    domain_add_parser.add_argument("domain", help="The domain to create.")
+    domain_add_parser.add_argument("--app-template", default="template", nargs="?", help="The template application name to search for.")
+    domain_add_parser.add_argument("--app-group", help="The group of the application.", nargs="?")
+    domain_add_parser.add_argument("--provider-template", default="template", help="The template provider name to search for.", nargs="?")
+    domain_add_parser.add_argument("--provider-mode", default="forward_single", choices=["proxy", "forward_single", "forward_domain"], help="The mode of the provider.")
+    domain_add_parser.add_argument("--provider-token-validity", default="hours=24", help="The token validity of the provider.", nargs="?")
+    domain_add_parser.add_argument("--outpost-name", default="authentik Embedded Outpost", help="The name of the outpost to be updated.", nargs="?")
     
-    add_domain_parser.add_argument("--outpost-name", default="authentik Embedded Outpost", help="The name of the outpost to be updated.")
 
+    '''
     # Delete domain parser
     delete_domain_parser = subparsers.add_parser("delete-domain", help="Deletes an application and provider.")
     delete_domain_parser.add_argument("domain", help="The domain to delete.")
     delete_domain_parser.add_argument("host", help="The Authentik instance url.")
     delete_domain_parser.add_argument("tokenfile", help="The path to a file containing an Authentik authentication token.")
     delete_domain_parser.add_argument("--provider-type", default="proxy", choices=["proxy", "ldap", "oauth2", "saml"], help="The provider type to match.")
-    
-    args = parser.parse_args()
+    '''
+    args = parser.parse_args(args)
 
+    if args.item == 'domain':
+        if args.operation == 'add':
+            __validate_options(args)
+            __add_domain(args)
+        else:
+            domain_parser.print_help()
+            sys.exit(1)
+    else:
+        parser.print_help()
+        sys.exit(1)
+
+    print("Success")
+    '''
     if args.command == "add-domain":
         token: Optiona[str] = read_token(args.tokenfile)
         if token is None:
@@ -51,67 +71,79 @@ def main():
     else:
         parser.print_help()
         sys.exit(1)
-    print("Success")
-    sys.exit()
+    '''
 
-def add_domain(name: str, domain: str, host: str, token: str, application_args:dict, provider_args:dict, outpost_args:dict) -> bool:
+def __validate_options(args):
+    def throwRequiredOptionException(option: str):
+        parsed_option = option
+        while parsed_option.startswith('-'):
+            parsed_option = parsed_option[1:]
+
+        value = getattr(args, parsed_option)
+        if value is None:
+            raise CLIException(f'The option \'{option}\' is undefined.')
+
+    throwRequiredOptionException("--host")
+    throwRequiredOptionException("--token")
+    throwRequiredOptionException("--port")
+
+def __add_domain(args):
+    provider_args: dict={"provider_template":args.provider_template, "mode":args.provider_mode, "token_validity":args.provider_token_validity}
+    application_args: dict={"app_template":args.app_template, "app_group":args.app_group}
+    outpost_args: dict={"name":args.outpost_name}
+
     provider_keys = ["provider_template", "mode", "token_validity"]
     app_keys = ["app_template", "app_group"]
     outpost_keys = ["name"]
     if validate_keys(app_keys, application_args.keys()) is False:
-        sys.exit("Invalid keys passed to application arguments.")
+        raise CLIException('Invalid keys passed to application arguments')
     if validate_keys(provider_keys, provider_args.keys()) is False:
-        sys.exit("Invalid keys passed to provider arguments.")
+        raise CLIException("Invalid keys passed to provider arguments.")
     if validate_keys(outpost_keys, outpost_args.keys()) is False:
-        sys.exit("Invalid keys passed to outpost arguments.")
-    
+        raise CLIException("Invalid keys passed to outpost arguments.")
+
     modes = ["proxy", "forward_single", "forward_domain"]
     if provider_args['mode'] not in modes:
-        sys.exit("Unimplemented provider mode selected")
-
-    with AuthentikAPI(host, token) as authentik:
+        raise CLIException(f'Unimplemented provider mode \'{provider_args["mode"]}\' selected.')
+    
+    with AuthentikAPI(args.host, args.port, args.token) as authentik:
         # Check provider is not already registered
-        providers: Optional[dict] = authentik.get_applications(full_list=True)
-        if providers is None:
-            sys.exit("Failed to fetch providers.")
-        for provider in providers['results']:
-            if name == provider["name"]:
-                sys.exit("This name is already registered with a provider.")
+        providers: dict = authentik.get_applications(full_list=True)
+        for provider in providers:
+            if args.name == provider["name"]:
+                raise CLIException(f'The name {args.name} is already registered with a provider.')
+            if f'https://{args.domain}' == provider["launch_url"]:
+                raise CLIException(f'The domain {args.domain} is already registered with a provider.')
 
         # Fetch app template
-        app_template: Optional[dict] = get_app_template(authentik, application_args['app_template'])
-        if app_template is None: 
-            sys.exit("Failed to fetch application template.")
+        app_template: dict = __get_app_template(authentik, application_args['app_template'])
         
         # Fetch provider template
-        provider_template: Optional[dict] = get_provider_template(authentik, provider_args['provider_template'])
-        if provider_template is None:
-            sys.exit("Failed to fetch provider template.")
+        provider_template: dict = __get_provider_template(authentik, provider_args['provider_template'])
         
         # Assemble parameters based on type
         if provider_args["mode"] == "forward_single":
-            params: dict = {"name":name, "authorization_flow":provider_template["authorization_flow"], "external_host":f'https://{domain}',
+            params: dict = {"name":args.name, "authorization_flow":provider_template["authorization_flow"], "external_host":f'https://{args.domain}',
                         "mode":provider_args["mode"], "token_validity":provider_args['token_validity']}
         
         # Create provider
-        new_provider: Optiona[dict] = authentik.create_proxy_provider(params)
-        if new_provider is None:
-            sys.exit("Failed to create proxy provider.")
+        providerUuid: str = authentik.create_proxy_provider(params)['pk']
 
-        params: dict={"name":name, "slug":create_slug(name), "policy_engine_mode":app_template["policy_engine_mode"], "provider":new_provider["pk"]}
+        params: dict={"name":args.name, "slug":__create_slug(args.name), "policy_engine_mode":app_template["policy_engine_mode"], "provider":providerUuid}
         if application_args['app_group'] is not None:
             params["group"] = application_args["app_group"]
         
         # Create application
-        new_application: Optional[dict] = authentik.create_application(params)
-        if new_application is None:
-            authentik.delete_provider(new_provider['pk'])
-            sys.exit("Failed to create application.")
+        try:
+            new_application: dict = authentik.create_application(params)
+        except Exception as e:
+            authentik.delete_provider(providerUuid)
+            raise e
         
-        # Apply policies
-        template_policies: Optional[dict] = authentik.get_policy_bindings(app_template['pk'])
-        if template_policies is not None:
-            for policy in template_policies['results']:
+        try:
+            # Apply policies
+            template_policies: dict = authentik.get_policy_bindings(app_template['pk'])
+            for policy in template_policies:
                 params: dict={"target":new_application['pk'], "negate":policy["negate"], "enabled":policy['enabled'], "order":policy['order'], "timeout":policy['timeout']}
                 if policy['policy'] is not None:
                     params['policy'] = policy['policy']
@@ -120,27 +152,23 @@ def add_domain(name: str, domain: str, host: str, token: str, application_args:d
                 if policy['user'] is not None:
                     params['user'] = policy['user']
 
-                new_policy: Optional[dict]=authentik.create_policy_binding(params)
-                if new_policy is None:
-                    authentik.delete_application(new_application['slug'])
-                    authentik.delete_provider(new_provider['pk'])
-                    sys.exit("Failed to bind policy.")
-        
-        # Add provider to the outpost
-        outpost = get_outpost(authentik, outpost_args["name"])
-        if outpost is None:
+                authentik.create_policy_binding(params)
+            
+            # Add provider to the outpost
+            outpost = __get_outpost(authentik, outpost_args["name"])
+            
+            providers: list=outpost["providers"]
+            providers.append(providerUuid)
+            params: dict={"providers":providers}
+            authentik.update_outpost(outpost['pk'], params)
+        except Exception as e:
             authentik.delete_application(new_application['slug'])
-            authentik.delete_provider(new_provider['pk'])
-            sys.exit("Failed to retireve outpost.")
+            authentik.delete_provider(providerUuid)
+            raise e
         
-        providers: list=outpost["providers"]
-        providers.append(new_provider['pk'])
-        params: dict={"providers":providers}
-        if authentik.update_outpost(outpost['pk'], params) is None:
-            authentik.delete_application(new_application['slug'])
-            authentik.delete_provider(new_provider['pk'])
-            sys.exit("Failed to update outpost.")
+        
 
+'''
 def delete_domain(domain: str, prov_type: str, host: str, token: str):
     with AuthentikAPI(host, token) as authentik:
         domain: Optional[dict] = match_domain(authentik, domain, prov_type)
@@ -168,42 +196,38 @@ def match_domain(authentik: AuthentikAPI, domain: str, prov_type: str) -> Option
                 provider = detail
                 break
     return provider
-
-def get_app_template(authentik: AuthentikAPI, name: str) -> Optional[dict]:
+'''
+def __get_app_template(authentik: AuthentikAPI, name: str) -> dict:
     templates = authentik.get_applications(name, True)
-    if templates is None: return None
-    for template in templates['results']:
+    for template in templates:
         if template['name'] == name: return template
-    return None
 
-def get_provider_template(authentik: AuthentikAPI, name: str) -> Optional[dict]:
+    raise CLIException(f'Failed to fetch application template \'{name}\'.')
+
+def __get_provider_template(authentik: AuthentikAPI, name: str) -> dict:
     templates = authentik.get_providers(name)
-    if templates is None: return None
-    for template in templates['results']:
+    for template in templates:
         if template['name'] == name: return template
-    return None
+    
+    raise CLIException(f'Failed to fetch provider template \'{name}\'.')
 
-def get_outpost(authentik: AuthentikAPI, name: str) -> Optional[dict]:
-    outposts: Optional[dict]= authentik.get_outposts(name)
-    if outposts is None: return None
-    for outpost in outposts['results']:
+def __get_outpost(authentik: AuthentikAPI, name: str) -> dict:
+    outposts: dict= authentik.get_outposts(name)
+    for outpost in outposts:
         if outpost['name'] == name: return outpost
-    return None
+    
+    raise CLIException(f'Failed to fetch output \'{name}\'.')
 
-def create_slug(name: str) -> str:
+def __create_slug(name: str) -> str:
     slug = name.replace(' ', '-')
     slug = slug.lower()
     slug = re.sub(r'[^-a-zA-Z0-9_]', "", slug)
     return slug
 
-def read_token(token_file: str) -> Optional[str]:
-    try:
-        if os.path.exists(token_file) and os.path.isfile(token_file):
-            with open(token_file, 'r') as file:
-                return file.read().strip()
-    except Exception:
-        return None
-    return None
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f'Exception occurred: {str(e)}')
+        sys.exit(1)

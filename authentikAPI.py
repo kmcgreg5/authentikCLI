@@ -1,12 +1,17 @@
-from typing import Optional, Final
 from requests import Session
+import typing
+
+class APIException(Exception):
+    pass
 
 class AuthentikAPI:
-    version: Final[str] = "v3"
-    def __init__(self, host: str=None, token: str=None):
-        self._host: Optional[str] = host
-        self.__token: Optional[str] = token
-        self._session: Optional[Session] = None
+    DEFAULT_PORT: int = 9000
+    VERSION: str = "v3"
+    def __init__(self, host: str=None, port: int=DEFAULT_PORT, token: str=None):
+        self._host = host
+        self._port = port
+        self.__token = token
+        self._session = None
     
     def start_session(self):
         if self._session is None:
@@ -16,126 +21,137 @@ class AuthentikAPI:
         if self._session is not None:
             self._session.close()
             self._session = None
+    
+    def __get_host(self) -> str:
+        return f'http://{self._host}:{self._port}'
+    
+    def __get_url(self, endPoint):
+        return f'{self.__get_host()}/api/{self.VERSION}{endPoint}'
 
-    def get_provider_types(self) -> Optional[dict]:
-        response = self._session.get(f'{self._host}/api/{self.version}/providers/all/types/', headers={'Authorization':f'Bearer {self.__token}'})
-        if response.status_code == 200:
-            return response.json()
-        return None
+    def __validate_response(self, response, *args) -> typing.Any:
+        if response.status_code != 200 and response.status_code != 201 and response.status_code != 204:
+            raise APIException(response.text)
+        
+        json = response.json()    
+        #if len(args) == 0:
+        #    return
+        
+        return_value = json
+        for arg in args:
+            return_value = return_value[arg]
+        
+        return return_value
+    
+    def __get_token_header(self) -> dict:
+        return {'Authorization':f'Bearer {self.__token}'}
 
-    def get_providers(self, search: str=None) -> Optional[dict]:
+    def get_provider_types(self) -> dict:
+        endPoint = f'/providers/all/types/'
+        response = self._session.get(self.__get_url(endPoint), headers=self.__get_token_header())
+        return self.__validate_response(response)
+
+    def get_providers(self, search: str=None) -> dict:
         params: dict = {}
         if search is not None:
             params["search"] = search
-        response = self._session.get(f'{self._host}/api/{self.version}/providers/all/', params=params, headers={'Authorization':f'Bearer {self.__token}'})
-        if response.status_code == 200:
-            return response.json()
-        return None
+
+        endPoint = "/providers/all/"
+        response = self._session.get(self.__get_url(endPoint), params=params, headers=self.__get_token_header())
+        return self.__validate_response(response, 'results')
     
-    def get_provider(self, uuid: str, provider_type: str) -> Optional[dict]:
-        response = self._session.get(f'{self._host}/api/{self.version}/providers/{provider_type}/{uuid}/', headers={'Authorization':f'Bearer {self.__token}'})
-        if response.status_code == 200:
-            return response.json()
-        return None
+    def get_provider(self, uuid: str, provider_type: str) -> dict:
+        endPoint = f'/providers/{provider_type}/{uuid}/'
+        response = self._session.get(self.__get_url(endPoint), headers=self.__get_token_header())
+        return self.__validate_response(response)
     
-    def delete_provider(self, uuid: str) -> bool:
-        response = self._session.delete(f'{self._host}/api/{self.version}/providers/all/{uuid}/', headers={'Authorization':f'Bearer {self.__token}'})
-        if response.status_code == 204:
-            return True
-        return False
+    def delete_provider(self, uuid: str):
+        endPoint = f'/providers/all/{uuid}/'
+        response = self._session.delete(self.__get_url(endPoint), headers=self.__get_token_header())
+        self.__validate_response(response)
     
-    def get_applications(self, search: str=None, full_list: bool=False) -> Optional[dict]:
+    def get_applications(self, search: str=None, full_list: bool=False) -> dict:
         params: dict = {"superuser_full_list":full_list}
         if search is not None:
             params["search"] = search
-        response = self._session.get(f'{self._host}/api/{self.version}/core/applications/', params=params, headers={'Authorization':f'Bearer {self.__token}'})
-        if response.status_code == 200:
-            return response.json()
-        return None
+        
+        endPoint = '/core/applications/'
+        response = self._session.get(self.__get_url(endPoint), params=params, headers=self.__get_token_header())
+        return self.__validate_response(response, 'results')
     
-    def get_application(self, slug: str) -> Optional[dict]:
-        response = self._session.get(f'{self._host}/api/{self.version}/core/applications/{slug}/', headers={'Authorization':f'Bearer {self.__token}'})
-        if response.status_code == 200:
-            return response.json()
-        return None
+    def get_application(self, slug: str) -> dict:
+        endPoint = f'/core/applications/{slug}/'
+        response = self._session.get(self.__get_url(endPoint), headers=self.__get_token_header())
+        return self.__validate_response(response)
     
     def delete_application(self, slug: str) -> bool:
-        response = self._session.delete(f'{self._host}/api/{self.version}/core/applications/{slug}/', headers={'Authorization':f'Bearer {self.__token}'})
-        if response.status_code == 204:
-            return True
-        return False
+        endPoint = f'/core/applications/{slug}/'
+        response = self._session.delete(self.__get_url(endPoint), headers=self.__get_token_header())
+        return self.__validate_response(response)
 
-    def get_policies(self) -> Optional[dict]:
-        response = self._session.get(f'{self._host}/api/{self.version}/policies/all/', headers={'Authorization':f'Bearer {self.__token}'})
-        if response.status_code == 200:
-            return response.json()
-        return None
+    def get_policies(self) -> typing.Optional[dict]:
+        endPoint = '/policies/all/'
+        response = self._session.get(self.__get_url(endPoint), headers=self.__get_token_header())
+        return self.__validate_response(response, 'results')
 
-    def get_policy_bindings(self, target_uuid: str=None) -> Optional[dict]: 
+    def get_policy_bindings(self, target_uuid: str=None) -> dict: 
         params: dict = {}
         if target_uuid is not None:
             params["target"] = target_uuid
-        response = self._session.get(f'{self._host}/api/{self.version}/policies/bindings/', params=params, headers={'Authorization':f'Bearer {self.__token}'})
-        if response.status_code == 200:
-            return response.json()
-        return None
+        
+        endPoint = '/policies/bindings/'
+        response = self._session.get(self.__get_url(endPoint), params=params, headers=self.__get_token_header())
+        return self.__validate_response(response, 'results')
     
-    def get_property_mapping(self, uuid: str) -> Optional[dict]:
-        response = self._session.get(f'{self._host}/api/{self.version}/propertymappings/all/{uuid}/', headers={'Authorization':f'Bearer {self.__token}'})
-        if response.status_code == 200:
-            return response.json()
-        return None
+    def get_property_mapping(self, uuid: str) -> dict:
+        endPoint = f'/propertymappings/all/{uuid}/'
+        response = self._session.get(self.__get_url(endPoint), headers=self.__get_token_header())
+        return self.__validate_response(response)
     
-    def create_policy_binding(self, params: dict) -> Optional[dict]: # template app uuid 220fa8cc-8519-42fc-8b11-5b3f93f3ba34
+    def create_policy_binding(self, params: dict) -> dict: # template app uuid 220fa8cc-8519-42fc-8b11-5b3f93f3ba34
         valid_keys = ["policy", "group", "user", "target", "negate", "enabled", "order", "timeout"]
         if validate_keys(valid_keys, params.keys()) is False:
-            return None
+            raise APIException("Invalid keys passed to policy binding creation.")
 
-        response = self._session.post(f'{self._host}/api/{self.version}/policies/bindings/', json=params, headers={'Authorization':f'Bearer {self.__token}'})
-        if response.status_code == 201:
-            return response.json()
-        return None
+        endPoint = '/policies/bindings/'
+        response = self._session.post(self.__get_url(endPoint), json=params, headers=self.__get_token_header())
+        return self.__validate_response(response)
     
-    def create_application(self, params: dict) -> Optional[dict]:
+    def create_application(self, params: dict) -> dict:
         valid_keys = ["name", "slug", "provider", "open_in_new_tab", "meta_launch_url", "meta_description", "meta_publisher", "policy_engine_mode", "group"]
         if validate_keys(valid_keys, params.keys()) is False:
-            return None
+            raise APIException("Invalid keys passed to application creation.")
 
-        response = self._session.post(f'{self._host}/api/{self.version}/core/applications/', json=params, headers={'Authorization':f'Bearer {self.__token}'})
-        if response.status_code == 201:
-            return response.json()
-        return None
+        endPoint = "/core/applications/"
+        response = self._session.post(self.__get_url(endPoint), json=params, headers=self.__get_token_header())
+        return self.__validate_response(response)
     
-    def create_proxy_provider(self, params: dict) -> Optional[dict]:
+    def create_proxy_provider(self, params: dict) -> dict:
         valid_keys = ["search", "name", "authorization_flow", "property_mappings", "internal_host", "external_host",  "internal_host_ssl_validation", "certificate", "skip_path_regex", "basic_auth_enabled",
                 "basic_auth_password_attribute", "basic_auth_user_attribute", "mode", "intercept_header_auth", "cookie_domain", "jwks_sources", "token_validity"]
         if validate_keys(valid_keys, params.keys()) is False:
-            return None
+            raise APIException("Invalid keys passed to provider creation.")
 
-        response = self._session.post(f'{self._host}/api/{self.version}/providers/proxy/', json=params, headers={'Authorization':f'Bearer {self.__token}'})
-        if response.status_code == 201:
-            return response.json()
-        
-        return None
+        endPoint = "/providers/proxy/"
+        response = self._session.post(self.__get_url(endPoint), json=params, headers=self.__get_token_header())
+        return self.__validate_response(response)
     
-    def get_outposts(self, search: str=None) -> Optional[dict]:
+    def get_outposts(self, search: str=None) -> dict:
         params: dict = {}
         if search is not None:
             params["search"] = search
-        response = self._session.get(f'{self._host}/api/{self.version}/outposts/instances/', params=params, headers={'Authorization':f'Bearer {self.__token}'})
-        if response.status_code == 200:
-            return response.json()
-        return None
+        
+        endPoint = '/outposts/instances/'
+        response = self._session.get(self.__get_url(endPoint), params=params, headers=self.__get_token_header())
+        return self.__validate_response(response, 'results')
 
-    def update_outpost(self, uuid: str, params: dict) -> Optional[dict]:
+    def update_outpost(self, uuid: str, params: dict) -> dict:
         valid_keys = ["name", "type", "providers", "service_connection", "config", "managed"]
         if validate_keys(valid_keys, params.keys()) is False:
-            return None
+            raise APIException("Invalid keys passed to outpost update.")
 
-        response = self._session.patch(f'{self._host}/api/{self.version}/outposts/instances/{uuid}/', json=params, headers={'Authorization':f'Bearer {self.__token}'})
-        if response.status_code == 200:
-            return response.json()
-        return None
+        endPoint = f'/outposts/instances/{uuid}/'
+        response = self._session.patch(self.__get_url(endPoint), json=params, headers={'Authorization':f'Bearer {self.__token}'})
+        return self.__validate_response(response)
 
     def __enter__(self):
         self.start_session()
