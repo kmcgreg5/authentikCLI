@@ -181,7 +181,7 @@ def __remove_domain(args):
 
 def __match_domain(authentik: AuthentikAPI, domain: str, provider_type: str) -> Optional[dict]:
     types: list = ["proxy"] # TODO: Unimplemented type matching: "ldap", "oauth2", "saml"
-    if prov_type not in types: return None
+    if provider_type not in types: return None
     
     providers: Optional[dict] = authentik.get_providers()
     if providers is None: return None
