@@ -174,7 +174,7 @@ def __add_domain(args):
         
 def __remove_domain(args):
     with AuthentikAPI(args.host, args.port, args.token) as authentik:
-        domain: Optional[dict] = match_domain(authentik, args.domain, args.provider_type)
+        domain: Optional[dict] = __match_domain(authentik, args.domain, args.provider_type)
         if domain is None:
             raise CLIException(f'Failed to match the domain \'{args.domain}\'.')
         if authentik.delete_application(domain["assigned_application_slug"]) is False:
