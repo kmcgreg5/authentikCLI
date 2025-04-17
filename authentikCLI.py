@@ -166,14 +166,26 @@ def __add_domain(args):
         
 def __remove_domain(args):
     with AuthentikAPI(args.host, args.port, args.token) as authentik:
-        provider: Optional[dict] = __match_domain(authentik, args.domain, args.provider_type)
-        print(provider)
-        if provider is None:
+        domain: Optional[dict] = __match_domain(authentik, args.domain, args.provider_type)
+        if domain is None:
             raise CLIException(f'Failed to match the domain \'{args.domain}\'.')
-        if authentik.delete_application(provider["assigned_application_slug"]) is False:
-            raise CLIException(f'Failed to remove the application.')
-        if authentik.delete_provider(provider['pk']) is False:
-            raise CLIException(f'Failed to remove the provider.')
+        error_message: str = ""
+        error_count: int = 0
+        if authentik.delete_application(domain["assigned_application_slug"]) is False:
+            error_message = f'Failed to remove the application'
+            error_count += 1
+
+        if authentik.delete_provider(domain['pk']) is False:
+            error_count += 1
+            if error_message == "":
+                error_message = f'Failed to remove the provider'
+            else:
+                error_message += ' and the provider'
+            
+        if error_count > 1:
+            error_message += '.'
+            raise CLIException(error_message)
+
 
 '''
     COMMAND HELPER METHODS

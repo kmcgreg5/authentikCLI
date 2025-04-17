@@ -28,8 +28,12 @@ class AuthentikAPI:
     def __get_url(self, endPoint):
         return f'{self.__get_host()}/api/{self.VERSION}{endPoint}'
 
-    def __validate_response(self, response, *args) -> typing.Any:
-        if response.status_code != 200 and response.status_code != 201 and response.status_code != 204:
+    def __validate_response(self, response, additional_codes, *args) -> typing.Any:
+        additional_code_status: bool = True
+        if (additional_codes is not None and response.status_code not in additional_codes):
+                additional_code_status = False
+
+        if response.status_code != 200 and response.status_code != 201 and response.status_code != 204 and additional_code_status:
             raise APIException(response.text)
         
         json = response.json()    
@@ -48,7 +52,7 @@ class AuthentikAPI:
     def get_provider_types(self) -> dict:
         endPoint = f'/providers/all/types/'
         response = self._session.get(self.__get_url(endPoint), headers=self.__get_token_header())
-        return self.__validate_response(response)
+        return self.__validate_response(response, None)
 
     def get_providers(self, search: str=None) -> [dict]:
         params: dict = {}
@@ -57,17 +61,17 @@ class AuthentikAPI:
 
         endPoint = "/providers/all/"
         response = self._session.get(self.__get_url(endPoint), params=params, headers=self.__get_token_header())
-        return self.__validate_response(response, 'results')
+        return self.__validate_response(response, None, 'results')
     
     def get_provider(self, uuid: str, provider_type: str) -> dict:
         endPoint = f'/providers/{provider_type}/{uuid}/'
         response = self._session.get(self.__get_url(endPoint), headers=self.__get_token_header())
-        return self.__validate_response(response)
+        return self.__validate_response(response, None)
     
     def delete_provider(self, uuid: str):
         endPoint = f'/providers/all/{uuid}/'
         response = self._session.delete(self.__get_url(endPoint), headers=self.__get_token_header())
-        self.__validate_response(response)
+        self.__validate_response(response, None)
     
     def get_applications(self, search: str=None, full_list: bool=False) -> dict:
         params: dict = {"superuser_full_list":full_list}
@@ -76,23 +80,23 @@ class AuthentikAPI:
         
         endPoint = '/core/applications/'
         response = self._session.get(self.__get_url(endPoint), params=params, headers=self.__get_token_header())
-        return self.__validate_response(response, 'results')
+        return self.__validate_response(response, None, 'results')
     
     def get_application(self, slug: str) -> dict:
         endPoint = f'/core/applications/{slug}/'
         response = self._session.get(self.__get_url(endPoint), headers=self.__get_token_header())
-        return self.__validate_response(response)
+        return self.__validate_response(response, None)
     
     def delete_application(self, slug: str) -> bool:
         endPoint = f'/core/applications/{slug}/'
         response = self._session.delete(self.__get_url(endPoint), headers=self.__get_token_header())
         print(response)
-        return self.__validate_response(response)
+        return self.__validate_response(response, None)
 
     def get_policies(self) -> typing.Optional[dict]:
         endPoint = '/policies/all/'
         response = self._session.get(self.__get_url(endPoint), headers=self.__get_token_header())
-        return self.__validate_response(response, 'results')
+        return self.__validate_response(response, None, 'results')
 
     def get_policy_bindings(self, target_uuid: str=None) -> dict: 
         params: dict = {}
@@ -101,12 +105,12 @@ class AuthentikAPI:
         
         endPoint = '/policies/bindings/'
         response = self._session.get(self.__get_url(endPoint), params=params, headers=self.__get_token_header())
-        return self.__validate_response(response, 'results')
+        return self.__validate_response(response, None, 'results')
     
     def get_property_mapping(self, uuid: str) -> dict:
         endPoint = f'/propertymappings/all/{uuid}/'
         response = self._session.get(self.__get_url(endPoint), headers=self.__get_token_header())
-        return self.__validate_response(response)
+        return self.__validate_response(response, None)
     
     def create_policy_binding(self, params: dict) -> dict: # template app uuid 220fa8cc-8519-42fc-8b11-5b3f93f3ba34
         valid_keys = ["policy", "group", "user", "target", "negate", "enabled", "order", "timeout"]
@@ -115,7 +119,7 @@ class AuthentikAPI:
 
         endPoint = '/policies/bindings/'
         response = self._session.post(self.__get_url(endPoint), json=params, headers=self.__get_token_header())
-        return self.__validate_response(response)
+        return self.__validate_response(response, None)
     
     def create_application(self, params: dict) -> dict:
         valid_keys = ["name", "slug", "provider", "open_in_new_tab", "meta_launch_url", "meta_description", "meta_publisher", "policy_engine_mode", "group"]
@@ -124,7 +128,7 @@ class AuthentikAPI:
 
         endPoint = "/core/applications/"
         response = self._session.post(self.__get_url(endPoint), json=params, headers=self.__get_token_header())
-        return self.__validate_response(response)
+        return self.__validate_response(response, None)
     
     def create_proxy_provider(self, params: dict) -> dict:
         valid_keys = ["search", "name", "authorization_flow", "property_mappings", "internal_host", "external_host",  "internal_host_ssl_validation", "certificate", "skip_path_regex", "basic_auth_enabled",
@@ -134,7 +138,7 @@ class AuthentikAPI:
 
         endPoint = "/providers/proxy/"
         response = self._session.post(self.__get_url(endPoint), json=params, headers=self.__get_token_header())
-        return self.__validate_response(response)
+        return self.__validate_response(response, None)
     
     def get_outposts(self, search: str=None) -> dict:
         params: dict = {}
@@ -143,7 +147,7 @@ class AuthentikAPI:
         
         endPoint = '/outposts/instances/'
         response = self._session.get(self.__get_url(endPoint), params=params, headers=self.__get_token_header())
-        return self.__validate_response(response, 'results')
+        return self.__validate_response(response, None, 'results')
 
     def update_outpost(self, uuid: str, params: dict) -> dict:
         valid_keys = ["name", "type", "providers", "service_connection", "config", "managed"]
@@ -152,7 +156,7 @@ class AuthentikAPI:
 
         endPoint = f'/outposts/instances/{uuid}/'
         response = self._session.patch(self.__get_url(endPoint), json=params, headers={'Authorization':f'Bearer {self.__token}'})
-        return self.__validate_response(response)
+        return self.__validate_response(response, None)
 
     def __enter__(self):
         self.start_session()
