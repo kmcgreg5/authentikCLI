@@ -30,7 +30,7 @@ def main(args: list=sys.argv[1:]):
         print(f'Exception occurred: {str(e)}')
         if (parsed_args is not None and parsed_args.debug):
             raise e
-        
+
         sys.exit(1)
 
     print("Success")
@@ -184,7 +184,7 @@ def __match_domain(authentik: AuthentikAPI, domain: str, prov_type: str) -> Opti
     
     providers: Optional[dict] = authentik.get_providers()
     if providers is None: return None
-    
+    print(f'Providers: {providers}')
     provider = None
     for item in providers['results']:
         detail: Optional[dict] = authentik.get_provider(item['pk'], prov_type)
