@@ -1,4 +1,4 @@
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 from authentikAPI import AuthentikAPI, validate_keys
 from typing import Optional
 import sys
@@ -9,10 +9,41 @@ class CLIException(Exception):
     pass
 
 def main(args: list=sys.argv[1:]):
+    parsed_args: Optional[Namespace] = None
+    try:
+        parsed_args = __parse_args(args)
+        if parsed_args.item == 'domain':
+            if parsed_args.operation == 'add':
+                __validate_options(parsed_args)
+                __add_domain(parsed_args)
+            elif parsed_args.operation == 'remove':
+                __validate_options(parsed_args)
+                __remove_domain(parsed_args)
+            else:
+                domain_parser.print_help()
+                sys.exit(1)
+        else:
+            parser.print_help()
+            sys.exit(1)
+
+    except Exception as e:
+        print(f'Exception occurred: {str(e)}')
+        if (parsed_args is not None and parsed_args.debug):
+            raise e
+        
+        sys.exit(1)
+
+    print("Success")
+
+'''
+    CLI HELPER METHODS
+'''
+def __parse_args(args):
     parser = ArgumentParser(prog="Authentik CLI")
     parser.add_argument("--host", help="The Authentik Server host.", nargs='?')
     parser.add_argument("--token", help="The token to use for authentication.", nargs='?')
     parser.add_argument("--port", help="The port to connect to.", nargs='?', type=int, default=AuthentikAPI.DEFAULT_PORT)
+    parser.add_argument("--debug", help="Whether to enable debug or not", action='store_true')
 
     items = parser.add_subparsers(help="The supported items to operate on.", dest="item")
 
@@ -34,46 +65,7 @@ def main(args: list=sys.argv[1:]):
     delete_domain_parser.add_argument("domain", help="The domain to remove.")
     delete_domain_parser.add_argument("--provider-type", default="proxy", choices=["proxy", "ldap", "oauth2", "saml"], help="The provider type to match.")
     
-    args = parser.parse_args(args)
-
-    if args.item == 'domain':
-        if args.operation == 'add':
-            __validate_options(args)
-            __add_domain(args)
-        elif args.operation == 'remove':
-            __validate_options(args)
-            __remove_domain(args)
-        else:
-            domain_parser.print_help()
-            sys.exit(1)
-    else:
-        parser.print_help()
-        sys.exit(1)
-
-    print("Success")
-    '''
-    if args.command == "add-domain":
-        token: Optiona[str] = read_token(args.tokenfile)
-        if token is None:
-            sys.exit("Failed to read token file.")
-        group: Optional[str] = None if args.app_group is None or args.app_group.strip() == '' else args.app_group
-        provider_args: dict={"provider_template":args.provider_template, "mode":args.provider_mode, "token_validity":args.provider_token_validity}
-        application_args: dict={"app_template":args.app_template, "app_group":group}
-        outpost_args: dict={"name":args.outpost_name}
-        add_domain(args.name, args.domain, args.host, token, application_args, provider_args, outpost_args)
-    elif args.command == "delete-domain":
-        token: Optiona[str] = read_token(args.tokenfile)
-        if token is None:
-            sys.exit("Failed to read token file.")
-        delete_domain(args.domain, args.provider_type, args.host, token)
-    else:
-        parser.print_help()
-        sys.exit(1)
-    '''
-
-'''
-    CLI HELPER METHODS
-'''
+    return parser.parse_args(args)
 
 def __validate_options(args):
     def throwRequiredOptionException(option: str):
@@ -233,9 +225,4 @@ def __create_slug(name: str) -> str:
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        print(f'Exception occurred: {str(e)}')
-        raise e
-        sys.exit(1)
+    main()
