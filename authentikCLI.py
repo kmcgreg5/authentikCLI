@@ -29,22 +29,20 @@ def main(args: list=sys.argv[1:]):
     domain_add_parser.add_argument("--provider-mode", default="forward_single", choices=["proxy", "forward_single", "forward_domain"], help="The mode of the provider.")
     domain_add_parser.add_argument("--provider-token-validity", default="hours=24", help="The token validity of the provider.", nargs="?")
     domain_add_parser.add_argument("--outpost-name", default="authentik Embedded Outpost", help="The name of the outpost to be updated.", nargs="?")
-    
-
-    '''
     # Delete domain parser
-    delete_domain_parser = subparsers.add_parser("delete-domain", help="Deletes an application and provider.")
-    delete_domain_parser.add_argument("domain", help="The domain to delete.")
-    delete_domain_parser.add_argument("host", help="The Authentik instance url.")
-    delete_domain_parser.add_argument("tokenfile", help="The path to a file containing an Authentik authentication token.")
+    delete_domain_parser = operations.add_parser("remove")
+    delete_domain_parser.add_argument("domain", help="The domain to remove.")
     delete_domain_parser.add_argument("--provider-type", default="proxy", choices=["proxy", "ldap", "oauth2", "saml"], help="The provider type to match.")
-    '''
+    
     args = parser.parse_args(args)
 
     if args.item == 'domain':
         if args.operation == 'add':
             __validate_options(args)
             __add_domain(args)
+        elif args.operation == 'remove':
+            __validate_options(args)
+            __remove_domain(args)
         else:
             domain_parser.print_help()
             sys.exit(1)
@@ -73,6 +71,10 @@ def main(args: list=sys.argv[1:]):
         sys.exit(1)
     '''
 
+'''
+    CLI HELPER METHODS
+'''
+
 def __validate_options(args):
     def throwRequiredOptionException(option: str):
         parsed_option = option
@@ -86,6 +88,10 @@ def __validate_options(args):
     throwRequiredOptionException("--host")
     throwRequiredOptionException("--token")
     throwRequiredOptionException("--port")
+
+'''
+    COMMANDS
+'''
 
 def __add_domain(args):
     provider_args: dict={"provider_template":args.provider_template, "mode":args.provider_mode, "token_validity":args.provider_token_validity}
@@ -166,20 +172,21 @@ def __add_domain(args):
             authentik.delete_provider(providerUuid)
             raise e
         
-        
+def __remove_domain(args):
+    with AuthentikAPI(args.host, args.port, args.token) as authentik:
+        domain: Optional[dict] = match_domain(authentik, args.domain, args.provider_type)
+        if domain is None:
+            raise CLIException(f'Failed to match the domain \'{args.domain}\'.')
+        if authentik.delete_application(domain["assigned_application_slug"]) is False:
+            raise CLIException(f'Failed to remove the application.')
+        if authentik.delete_provider(domain['pk']) is False:
+            raise CLIException(f'Failed to remove the provider.')
 
 '''
-def delete_domain(domain: str, prov_type: str, host: str, token: str):
-    with AuthentikAPI(host, token) as authentik:
-        domain: Optional[dict] = match_domain(authentik, domain, prov_type)
-        if domain is None:
-            sys.exit("Failed to match domain")
-        if authentik.delete_application(domain["assigned_application_slug"]) is False:
-            sys.exit("Failed to delete application.")
-        if authentik.delete_provider(domain['pk']) is False:
-            sys.exit("Failed to delete provider.")
+    COMMAND HELPER METHODS
+'''
 
-def match_domain(authentik: AuthentikAPI, domain: str, prov_type: str) -> Optional[dict]:
+def __match_domain(authentik: AuthentikAPI, domain: str, prov_type: str) -> Optional[dict]:
     types: list = ["proxy"] # TODO: Unimplemented type matching: "ldap", "oauth2", "saml"
     if prov_type not in types: return None
     
@@ -196,7 +203,7 @@ def match_domain(authentik: AuthentikAPI, domain: str, prov_type: str) -> Option
                 provider = detail
                 break
     return provider
-'''
+
 def __get_app_template(authentik: AuthentikAPI, name: str) -> dict:
     templates = authentik.get_applications(name, True)
     for template in templates:
