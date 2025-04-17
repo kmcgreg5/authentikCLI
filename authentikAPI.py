@@ -50,7 +50,7 @@ class AuthentikAPI:
         response = self._session.get(self.__get_url(endPoint), headers=self.__get_token_header())
         return self.__validate_response(response)
 
-    def get_providers(self, search: str=None) -> dict:
+    def get_providers(self, search: str=None) -> [dict]:
         params: dict = {}
         if search is not None:
             params["search"] = search
@@ -86,6 +86,7 @@ class AuthentikAPI:
     def delete_application(self, slug: str) -> bool:
         endPoint = f'/core/applications/{slug}/'
         response = self._session.delete(self.__get_url(endPoint), headers=self.__get_token_header())
+        print(reponse)
         return self.__validate_response(response)
 
     def get_policies(self) -> typing.Optional[dict]:
