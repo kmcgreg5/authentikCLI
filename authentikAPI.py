@@ -35,7 +35,7 @@ class AuthentikAPI:
             for code in additional_codes:
                 codes.append(code)
         
-        if response.status_code is not in codes:
+        if response.status_code not in codes:
             raise APIException(response.text)
         
         json = response.json()    
