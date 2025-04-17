@@ -166,19 +166,20 @@ def __add_domain(args):
         
 def __remove_domain(args):
     with AuthentikAPI(args.host, args.port, args.token) as authentik:
-        domain: Optional[dict] = __match_domain(authentik, args.domain, args.provider_type)
-        if domain is None:
+        provider: Optional[dict] = __match_domain(authentik, args.domain, args.provider_type)
+        print(provider)
+        if provider is None:
             raise CLIException(f'Failed to match the domain \'{args.domain}\'.')
-        if authentik.delete_application(domain["assigned_application_slug"]) is False:
+        if authentik.delete_application(provider["assigned_application_slug"]) is False:
             raise CLIException(f'Failed to remove the application.')
-        if authentik.delete_provider(domain['pk']) is False:
+        if authentik.delete_provider(provider['pk']) is False:
             raise CLIException(f'Failed to remove the provider.')
 
 '''
     COMMAND HELPER METHODS
 '''
 
-def __match_domain(authentik: AuthentikAPI, domain: str, prov_type: str) -> Optional[dict]:
+def __match_domain(authentik: AuthentikAPI, domain: str, provider_type: str) -> Optional[dict]:
     types: list = ["proxy"] # TODO: Unimplemented type matching: "ldap", "oauth2", "saml"
     if prov_type not in types: return None
     
@@ -187,10 +188,10 @@ def __match_domain(authentik: AuthentikAPI, domain: str, prov_type: str) -> Opti
 
     provider = None
     for item in providers:
-        detail: Optional[dict] = authentik.get_provider(item['pk'], prov_type)
+        detail: Optional[dict] = authentik.get_provider(item['pk'], provider_type)
         if detail is None: continue
 
-        if prov_type == "proxy":
+        if provider_type == "proxy":
             if domain in detail['external_host'].split("/"):
                 provider = detail
                 break
