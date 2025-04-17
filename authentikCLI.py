@@ -184,13 +184,9 @@ def __match_domain(authentik: AuthentikAPI, domain: str, prov_type: str) -> Opti
     
     providers: Optional[dict] = authentik.get_providers()
     if providers is None: return None
-    print(f'Providers: {providers[0]}')
-    for uuid in providers[0]['property_mappings']:
-        someproperty = authentik.get_property_mapping(uuid)
-        print(someproperty)
 
     provider = None
-    for item in providers['results']:
+    for item in providers:
         detail: Optional[dict] = authentik.get_provider(item['pk'], prov_type)
         if detail is None: continue
 
