@@ -86,7 +86,7 @@ class AuthentikAPI:
     def delete_application(self, slug: str) -> bool:
         endPoint = f'/core/applications/{slug}/'
         response = self._session.delete(self.__get_url(endPoint), headers=self.__get_token_header())
-        print(reponse)
+        print(response)
         return self.__validate_response(response)
 
     def get_policies(self) -> typing.Optional[dict]:
