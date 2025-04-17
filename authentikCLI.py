@@ -182,7 +182,7 @@ def __match_domain(authentik: AuthentikAPI, domain: str, prov_type: str) -> Opti
     types: list = ["proxy"] # TODO: Unimplemented type matching: "ldap", "oauth2", "saml"
     if prov_type not in types: return None
     
-    providers: Optional[dict] = authentik.get_providers()
+    providers: Optional[dict] = authentik.get_providers(domain)
     if providers is None: return None
     print(f'Providers: {providers}')
     provider = None
