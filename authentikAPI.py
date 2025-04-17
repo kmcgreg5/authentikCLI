@@ -29,11 +29,13 @@ class AuthentikAPI:
         return f'{self.__get_host()}/api/{self.VERSION}{endPoint}'
 
     def __validate_response(self, response, additional_codes, *args) -> typing.Any:
-        additional_code_status: bool = True
-        if (additional_codes is not None and response.status_code not in additional_codes):
-                additional_code_status = False
+        codes: list = [200, 201, 204]
 
-        if response.status_code != 200 and response.status_code != 201 and response.status_code != 204 and additional_code_status:
+        if additional_codes is not None:
+            for code in additional_codes:
+                codes.append(code)
+        
+        if response.status_code is not in codes:
             raise APIException(response.text)
         
         json = response.json()    
