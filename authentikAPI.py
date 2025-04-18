@@ -80,7 +80,7 @@ class AuthentikAPI:
     def delete_provider(self, uuid: str):
         endPoint = f'/providers/all/{uuid}/'
         response = self._session.delete(self.__get_url(endPoint), headers=self.__get_token_header())
-        self.__validate_response(response)
+        self.__validate_delete(response)
     
     def get_applications(self, search: str=None, full_list: bool=False) -> dict:
         params: dict = {"superuser_full_list":full_list}
