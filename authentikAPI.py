@@ -48,6 +48,17 @@ class AuthentikAPI:
         
         return return_value
     
+    def __validate_delete(self, response) -> bool:
+        valid_codes: list = [204, 404]
+
+        if response.status_code not in valid_codes:
+            raise APIException(response.text)
+        
+        if response.status_code == 204:
+            return True
+        
+        return False
+    
     def __get_token_header(self) -> dict:
         return {'Authorization':f'Bearer {self.__token}'}
 
