@@ -140,7 +140,7 @@ class AuthentikAPI:
     
     def create_proxy_provider(self, params: dict) -> dict:
         valid_keys = ["search", "name", "authorization_flow", "property_mappings", "internal_host", "external_host",  "internal_host_ssl_validation", "certificate", "skip_path_regex", "basic_auth_enabled",
-                "basic_auth_password_attribute", "basic_auth_user_attribute", "mode", "intercept_header_auth", "cookie_domain", "jwks_sources", "token_validity"]
+                "basic_auth_password_attribute", "basic_auth_user_attribute", "mode", "intercept_header_auth", "cookie_domain", "jwks_sources", "token_validity", "invalidation_flow"]
         if validate_keys(valid_keys, params.keys()) is False:
             raise APIException("Invalid keys passed to provider creation.")
 

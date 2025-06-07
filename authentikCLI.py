@@ -122,7 +122,7 @@ def __add_domain(args):
         # Assemble parameters based on type
         if provider_args["mode"] == "forward_single":
             params: dict = {"name":args.name, "authorization_flow":provider_template["authorization_flow"], "external_host":f'https://{args.domain}',
-                        "mode":provider_args["mode"], "token_validity":provider_args['token_validity']}
+                        "mode":provider_args["mode"], "token_validity":provider_args['token_validity'], "invalidation_flow":provider_template['invalidation_flow']}
         
         # Create provider
         providerUuid: str = authentik.create_proxy_provider(params)['pk']
